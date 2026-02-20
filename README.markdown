@@ -222,8 +222,8 @@ A FreeRTOS mutex keeps the shared data safe when both cores access it simultaneo
 ### Expected Memory Usage (ESP32 Dev Module, esp32 board package 3.x)
 
 ```
-Sketch uses ~1,088,000 bytes (83%) of program storage space.
-Global variables use ~41,300 bytes (12%) of dynamic memory.
+Sketch uses ~1,101,659 bytes (84%) of program storage space.
+Global variables use ~42,336 bytes (12%) of dynamic memory.
 ```
 
 These figures are normal. Both BLE and Bluetooth Classic stacks are compiled in together, which accounts for the relatively large binary size.
