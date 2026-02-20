@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RealDash CAN description file for the ESP32 Fardriver Gateway.
+
+  The ESP32 sends a single RealDash type-44 CAN frame with ID 0x3200 (12800
+  decimal) at ~30 Hz over Bluetooth Classic SPP ("Fardriver_Classic_Link").
+
+  Payload layout (8 bytes):
+    Bytes 0-1 : RPM              uint16, little-endian
+    Bytes 2-3 : Voltage × 10    uint16, little-endian  →  divide by 10 to get V
+    Byte  4   : Gear             uint8
+    Byte  5   : Controller Temp  int8   [°C]
+    Byte  6   : Motor Temp       int8   [°C]
+    Byte  7   : SOC              uint8  [%]
+
+  Import this file in RealDash:
+    Connections  →  Add  →  CAN / Lin Analyzer  →  RealDash CAN  →
+    choose this XML file.
+-->
+<RealDashCAN version="2">
+  <frames>
+
+    <!--
+      Frame ID 0x3200 = 12800 decimal.
+      All Fardriver parameters are packed into this single 8-byte frame.
+    -->
+    <frame id="12800" name="Fardriver Gateway" length="8" interval="50">
+
+      <!-- Bytes 0-1 : RPM (uint16 little-endian)
+           RealDash built-in channel 37 = Engine RPM -->
+      <value name="RPM"
+             targetId="37"
+             offset="0"
+             length="2"
+             type="uint16"
+             lsbfirst="true" />
+
+      <!-- Bytes 2-3 : Voltage × 10 (uint16 little-endian)
+           Divide raw value by 10 to recover volts.
+           RealDash built-in channel 12 = Battery Voltage -->
+      <value name="Battery Voltage"
+             targetId="12"
+             offset="2"
+             length="2"
+             type="uint16"
+             lsbfirst="true"
+             conversion="V/10" />
+
+      <!-- Byte 4 : Gear (uint8, 1 = first gear)
+           RealDash built-in channel 163 = Gear -->
+      <value name="Gear"
+             targetId="163"
+             offset="4"
+             length="1"
+             type="uint8" />
+
+      <!-- Byte 5 : Controller (Driver) Temperature (int8, °C)
+           RealDash built-in channel 14 = Coolant / Controller Temperature -->
+      <value name="Controller Temperature"
+             targetId="14"
+             offset="5"
+             length="1"
+             type="int8" />
+
+      <!-- Byte 6 : Motor Temperature (int8, °C)
+           RealDash built-in channel 152 = Oil / Motor Temperature -->
+      <value name="Motor Temperature"
+             targetId="152"
+             offset="6"
+             length="1"
+             type="int8" />
+
+      <!-- Byte 7 : State of Charge (uint8, 0-100 %)
+           RealDash built-in channel 478 = Fuel Level / SOC -->
+      <value name="SOC"
+             targetId="478"
+             offset="7"
+             length="1"
+             type="uint8" />
+
+    </frame>
+
+  </frames>
+</RealDashCAN>

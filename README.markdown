@@ -1,6 +1,17 @@
 # ESP32 Fardriver BLE Controller Reader
 
-## What This Code Does
+This repository contains two Arduino sketches for the ESP32:
+
+| Sketch | Folder | Purpose |
+|---|---|---|
+| **FardriverBLE** | `FardriverBLE.ino` (repository root) | Connects to the Fardriver controller over BLE and prints decoded data to the Serial Monitor. Great for testing and debugging. |
+| **FardriverGateway** | `FardriverGateway/` | Full gateway: reads Fardriver data via BLE **and** re-transmits it to the [RealDash](https://realdash.net/) app over Bluetooth Classic SPP. |
+
+---
+
+## FardriverBLE – Serial Monitor Reader
+
+### What This Code Does
 
 This Arduino sketch lets an ESP32 microcontroller connect to a Fardriver controller (used in electric bikes or scooters) over Bluetooth Low Energy (BLE). It reads data like voltage, current, power, RPM, gear, speed, temperatures, state of charge (SOC), and whether the bike is in regeneration mode (regen, when the battery is being charged during braking or coasting). The data is sent to the Serial Monitor in the Arduino IDE, so you can see it in real-time on your computer. This is a simplified version of my project, with the display code removed, perfect for testing or building your own eBike projects.
 
@@ -153,6 +164,94 @@ const int motor_pole_pairs = 16;
 - **Build a Display**: Add a screen (like an OLED) to show the data on your bike. You can ask AI tools for code to do this.
 - **Log Data**: Modify the code to save data to an SD card or send it to a phone app for tracking rides.
 - **Share Ideas**: Fork the GitHub repo and add your own features, like alerts for high temperatures or low SOC.
+
+---
+
+## FardriverGateway – BLE to RealDash Bridge
+
+### What It Does
+
+`FardriverGateway/FardriverGateway.ino` turns the ESP32 into a wireless gateway:
+
+- **BLE client (Core 0)** – scans for, connects to, and automatically reconnects to the Fardriver controller. Decodes incoming BLE packets using the same CRC algorithm and address table as the FardriverBLE sketch above.
+- **Bluetooth Classic server (Core 1)** – advertises itself as `"Fardriver_Classic_Link"` and streams live data to the RealDash app at ~33 Hz using the RealDash type-44 CAN protocol.
+
+A FreeRTOS mutex keeps the shared data safe when both cores access it simultaneously.
+
+### Requirements
+
+- **Hardware**: An ESP32 development board (e.g., ESP32 DevKit v1, WROOM-32). The ESP32-S2 and ESP32-S3 do **not** support Bluetooth Classic; use a standard ESP32.
+- **Software**: Arduino IDE with the ESP32 board package ≥ 2.0 installed.
+- **Libraries**: `BLEDevice.h` and `BluetoothSerial.h` — both are bundled with the ESP32 board package; no extra installation is needed.
+- **App**: [RealDash](https://realdash.net/) (Android / iOS / Windows). Free version supports the CAN connection.
+
+### Quick Start
+
+1. Open `FardriverGateway/FardriverGateway.ino` in Arduino IDE.
+2. Adjust the settings near the top of the file if needed:
+
+   ```cpp
+   // BLE UUIDs – find yours with the nRF Connect app (see FardriverBLE section above)
+   #define SERVICE_UUID        "0000ffe0-0000-1000-8000-00805f9b34fb"
+   #define CHARACTERISTIC_UUID "0000ffec-0000-1000-8000-00805f9b34fb"
+
+   // Bluetooth Classic name visible to RealDash
+   #define REALDASH_BT_NAME    "Fardriver_Classic_Link"
+
+   // Motor parameters
+   #define MOTOR_POLE_PAIRS      20      // adjust to your motor
+   #define WHEEL_CIRCUMFERENCE_M 1.416f  // adjust to your wheel
+   ```
+
+3. Select **Tools → Board → ESP32 Dev Module** (or your board), choose the correct port, and click **Upload**.
+4. In RealDash go to **Connections → Add → CAN / Lin Analyzer → RealDash CAN**, choose Bluetooth, select `Fardriver_Classic_Link`, and import `FardriverGateway/realdash.xml` as the description file.
+
+### RealDash XML
+
+`FardriverGateway/realdash.xml` maps all six parameters from CAN frame ID `0x3200` to RealDash built-in channels:
+
+| Parameter | RealDash channel ID |
+|---|---|
+| RPM | 37 |
+| Battery Voltage | 12 |
+| Gear | 163 |
+| Controller Temperature | 14 |
+| Motor Temperature | 152 |
+| State of Charge (SOC) | 478 |
+
+### Expected Memory Usage (ESP32 Dev Module, esp32 board package 3.x)
+
+```
+Sketch uses ~1,101,659 bytes (84%) of program storage space.
+Global variables use ~42,336 bytes (12%) of dynamic memory.
+```
+
+These figures are normal. Both BLE and Bluetooth Classic stacks are compiled in together, which accounts for the relatively large binary size.
+
+---
+
+## Compilation Notes
+
+### "BT: forcing BR/EDR max sync conn eff to 1" messages
+
+When compiling any sketch that includes the ESP32 BLE library you will see a large number of lines like:
+
+```
+note: '#pragma message: BT: forcing BR/EDR max sync conn eff to 1 (Bluedroid HFP requires SCO/eSCO)'
+```
+
+**These are informational notes, not warnings or errors.** They are emitted by the ESP32 BLE library's own internal header (`esp_bredr_cfg.h`) every time a translation unit that includes `esp_bt.h` is compiled. There is no issue with your code and no action is required on your part. The sketch compiles and runs correctly regardless of how many times this message appears.
+
+You can safely ignore these messages. The important lines to check at the end of the Arduino IDE output are:
+
+```
+Sketch uses XXXXXX bytes (XX%) of program storage space.  ← must be under 100 %
+Global variables use XXXXXX bytes (XX%) of dynamic memory. ← must be under 100 %
+```
+
+If those lines appear without an **error** line above them, the compilation was **successful**.
+
+---
 
 ## License
 
